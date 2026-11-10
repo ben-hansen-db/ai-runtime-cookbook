@@ -398,7 +398,7 @@ def run_training_loop(model: torch.nn.Module, data, params: dict) -> None:
                 {"train_seconds": elapsed, "seconds_per_step": elapsed / trained, "final_loss": loss.item()}
             )
     if ckpt is not None:
-        # Nothing is left to overlap with, so the final save is the one cost checkpointing adds.
+        # Nothing is left to overlap with, so the final save is the largest cost checkpointing adds.
         if saved_step != step + 1:
             ckpt.save(step + 1)
         ckpt.close()
