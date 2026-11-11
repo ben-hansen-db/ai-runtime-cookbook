@@ -5,7 +5,7 @@ environment:
 
 compute:
   num_accelerators: 1
-  accelerator_type: GPU_1xH100
+  accelerator_type: GPU_1xA10
 
 code_source:
   root_path: .
