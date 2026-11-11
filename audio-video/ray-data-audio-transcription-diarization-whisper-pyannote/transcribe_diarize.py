@@ -48,7 +48,7 @@ def model_access_error(repository):
         f"https://huggingface.co/{SEGMENTATION_MODEL}. "
         "Create a read token from that same account with access to both gated repositories, "
         "store it in the Databricks secret referenced by secrets.HF_TOKEN in workload.yaml, "
-        "then rerun databricks air run -f workload.yaml --profile <profile-name>."
+        "then rerun databricks air run -f workload.yaml."
     )
 
 
