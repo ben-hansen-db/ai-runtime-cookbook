@@ -1,5 +1,5 @@
 # Nemotron Super VL LoRA fine-tuning with NVIDIA NeMo AutoModel on one 8x H100 node.
-# Run from this directory: databricks air run -p PROFILE -f workload.yaml
+# Run from this directory: databricks air run -f workload.yaml
 
 experiment_name: air-nemotron-super-vl-cord-lora
 
@@ -11,7 +11,7 @@ environment:
   # nemo-automodel:26.08.00 lacks Super VL, so build and push this image once
   # before the first run (see README "Before you run"):
   #   docker build --platform linux/amd64 -t nemo-automodel-vl:26.08.00 .
-  #   databricks air images push -p PROFILE -s nemo-automodel-vl:26.08.00 \
+  #   databricks air images push -s nemo-automodel-vl:26.08.00 \
   #     --catalog main --schema default --artifact nemo-automodel-vl:26.08.00
   unity_catalog_image: main.default.nemo-automodel-vl:26.08.00
 
