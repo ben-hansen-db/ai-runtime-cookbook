@@ -40,9 +40,9 @@ OUTPUT_PATH = os.environ.get("OUTPUT_PATH", "/Volumes/main/default/air_examples/
 HF_TOKEN = os.environ.get("HF_TOKEN")
 
 
-def model_access_error(repository):
+def model_access_error():
     return RuntimeError(
-        f"Unable to load required Hugging Face model {repository}. "
+        "Unable to access the required Hugging Face models. "
         "Sign in to Hugging Face and accept the terms for BOTH "
         f"https://huggingface.co/{DIARIZATION_MODEL} and "
         f"https://huggingface.co/{SEGMENTATION_MODEL}. "
@@ -58,14 +58,14 @@ def check_model_access():
     from huggingface_hub.utils import HfHubHTTPError
 
     if not HF_TOKEN:
-        raise model_access_error(f"{DIARIZATION_MODEL} (HF_TOKEN is not set)")
+        raise model_access_error()
     for repository in (DIARIZATION_MODEL, SEGMENTATION_MODEL):
         try:
             # A HEAD request checks the current token even if files are cached.
             get_hf_file_metadata(hf_hub_url(repository, "config.yaml"), token=HF_TOKEN)
         except HfHubHTTPError as error:
             if error.response is not None and error.response.status_code in (401, 403, 404):
-                raise model_access_error(repository) from error
+                raise model_access_error() from error
             raise
 
 
@@ -124,7 +124,7 @@ class WhisperDiarizer:
         # Actors run in their own process (and, on multi-node, other hosts), so
         # re-check the token here rather than trusting the driver-only guard.
         if not HF_TOKEN:
-            raise model_access_error(f"{DIARIZATION_MODEL} (HF_TOKEN is not set in this actor)")
+            raise model_access_error()
 
         self.asr = BatchedInferencePipeline(
             WhisperModel(MODEL_SOURCE, device="cuda", compute_type="float16")
@@ -140,13 +140,13 @@ class WhisperDiarizer:
             )
         except HfHubHTTPError as error:
             if error.response is not None and error.response.status_code in (401, 403, 404):
-                raise model_access_error(f"{DIARIZATION_MODEL} or {SEGMENTATION_MODEL}") from error
+                raise model_access_error() from error
             raise
         finally:
             torch.load = _orig_load
         # pyannote can print an access warning and return None instead of raising.
         if diarizer is None:
-            raise model_access_error(f"{DIARIZATION_MODEL} or {SEGMENTATION_MODEL}")
+            raise model_access_error()
         self.diarizer = diarizer.to(torch.device("cuda"))
 
     def __call__(self, batch: dict) -> dict:
