@@ -200,12 +200,19 @@ def main():
     ray.init(address="auto")
     # Derive replicas from the live cluster so the example scales when nodes are added.
     total_gpus = int(ray.cluster_resources().get("GPU", 0))
-    print(f"Ray cluster ready: {total_gpus} GPU(s)", flush=True)
+    if total_gpus < 1:
+        raise RuntimeError("No GPUs found in the Ray cluster; cannot run vLLM inference.")
+    print(
+        f"Ray cluster ready: {total_gpus} GPU(s); starting {total_gpus} vLLM replicas "
+        "with one GPU each (tensor_parallel_size=1)",
+        flush=True,
+    )
 
     ds = load_images()
 
-    # vLLM engine config. concurrency = number of replicas Ray Data runs in parallel;
-    # one per GPU in the cluster here. engine_kwargs are passed through to the vLLM engine.
+    # Ray 2.56.1 treats an integer concurrency as an autoscaling range from 1 to n.
+    # Equal lower/upper bounds start one replica per GPU, including on short runs.
+    # engine_kwargs are passed through to the vLLM engine.
     config = vLLMEngineProcessorConfig(
         model_source=MODEL_SOURCE,
         engine_kwargs={
@@ -220,7 +227,7 @@ def main():
         },
         # Decodes the base64 images and builds the vision inputs for each request.
         prepare_multimodal_stage={"enabled": True},
-        concurrency=total_gpus,
+        concurrency=(total_gpus, total_gpus),
         batch_size=32,
     )
     processor = build_processor(config, preprocess=preprocess, postprocess=postprocess)
@@ -231,6 +238,8 @@ def main():
     start = time.time()
     out = processor(ds).materialize()
     elapsed = time.time() - start
+    # Include operator/actor execution statistics for diagnosing uneven GPU activity.
+    print(out.stats(), flush=True)
     # Overwrite so a re-run into the same directory replaces it instead of appending to it.
     out.drop_columns(["completed_at"]).write_parquet(RUN_OUTPUT_PATH, mode="overwrite")
 
