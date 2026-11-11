@@ -1,9 +1,7 @@
 experiment_name: python-quickstart
 
 environment:
-  version: 6
-  dependencies:
-    - torch==2.11.0
+  version: databricks_ai_v6
 
 compute:
   num_accelerators: 1
