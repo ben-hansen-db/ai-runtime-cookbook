@@ -4,18 +4,20 @@ This recipe uses Ray Data and vLLM to caption and classify the 3,669 photos in t
 
 ## Before you run
 
-`OUTPUT_PATH` in `workload.yaml` must be on an existing Unity Catalog volume that you can write to. If the volume is missing, ask a volume owner to create it with `CREATE VOLUME`, or change `OUTPUT_PATH` to another existing writable volume. The recipe checks the volume and write access before loading models. A failed check logs an `ERROR` and raises an exception containing the path and recovery steps; fix the volume or path and rerun the workload.
+`OUTPUT_PATH` in `workload.yaml` must be on an existing Unity Catalog volume that you can write to.
 
 ## Run
 
+Replace `PROFILE` with your Databricks CLI profile name.
+
 ```bash
-databricks air run -f workload.yaml
+databricks air run -p PROFILE -f workload.yaml
 ```
 
 For a quick test on one GPU:
 
 ```bash
-databricks air run -f workload.yaml \
+databricks air run -p PROFILE -f workload.yaml \
   --override compute.accelerator_type=GPU_1xH100 --override compute.num_accelerators=1 \
   --override env_variables.NUM_IMAGES=64
 ```
