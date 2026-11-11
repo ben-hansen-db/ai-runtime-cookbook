@@ -46,7 +46,7 @@ The base image and AutoModel source are public; no NGC login is required.
 ## Run
 
 ```bash
-databricks air run -f workload.yaml
+databricks air run -f workload.yaml --watch
 ```
 
 ## Results
