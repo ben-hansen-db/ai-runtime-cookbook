@@ -6,6 +6,7 @@ Run with: python3 -m unittest discover -s <recipe-directory> -p 'test_*.py'
 import importlib.util
 from pathlib import Path
 import sys
+from tempfile import TemporaryDirectory
 from types import ModuleType
 import unittest
 from unittest.mock import MagicMock, patch
@@ -36,6 +37,10 @@ class StopBeforeInference(Exception):
 class ReplicaPoolTest(unittest.TestCase):
     def setUp(self):
         self.recipe = load_recipe()
+        output = TemporaryDirectory()
+        self.addCleanup(output.cleanup)
+        self.recipe.OUTPUT_PATH = output.name
+        self.recipe.RUN_OUTPUT_PATH = str(Path(output.name) / "run")
         self.recipe.ray.init = MagicMock()
         self.recipe.ray.cluster_resources = MagicMock()
         self.recipe.load_images = MagicMock()
@@ -48,7 +53,7 @@ class ReplicaPoolTest(unittest.TestCase):
         for gpu_count in (1, 8, 16):
             with self.subTest(gpu_count=gpu_count):
                 self.recipe.ray.cluster_resources.return_value = {"GPU": gpu_count}
-                with patch.object(self.recipe.os, "makedirs"), patch("builtins.print"):
+                with patch("builtins.print"):
                     with self.assertRaises(StopBeforeInference):
                         self.recipe.main()
                 settings = self.recipe.vLLMEngineProcessorConfig.call_args[1]
@@ -59,9 +64,8 @@ class ReplicaPoolTest(unittest.TestCase):
         for resources in ({}, {"GPU": 0}):
             with self.subTest(resources=resources):
                 self.recipe.ray.cluster_resources.return_value = resources
-                with patch.object(self.recipe.os, "makedirs"):
-                    with self.assertRaisesRegex(RuntimeError, "No GPUs found"):
-                        self.recipe.main()
+                with self.assertRaisesRegex(RuntimeError, "No GPUs found"):
+                    self.recipe.main()
         self.recipe.load_images.assert_not_called()
         self.recipe.vLLMEngineProcessorConfig.assert_not_called()
         self.recipe.build_processor.assert_not_called()
