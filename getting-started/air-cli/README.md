@@ -6,10 +6,8 @@ This is the runnable example corresponding to the [AI Runtime CLI quickstart](ht
 
 ## Run
 
-Replace `PROFILE` with your Databricks CLI profile name.
-
 ```bash
-databricks air run -p PROFILE --file workload.yaml --watch
+databricks air run --file workload.yaml --watch
 ```
 
 To bring your own stack, replace the `environment` block with Standard environment version 6 and explicit dependencies:
