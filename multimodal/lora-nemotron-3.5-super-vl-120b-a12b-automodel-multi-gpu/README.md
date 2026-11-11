@@ -10,45 +10,43 @@ Workload execution takes about 12 minutes. For the first run, the one-time image
 
 ## Before you run
 
-Complete these steps in order from this recipe's directory. On macOS, the image is built locally in Docker Desktop; training runs on AI Runtime.
+Complete these steps from this recipe's directory. Replace `PROFILE` with your Databricks CLI profile name.
 
-1. Configure and authenticate the Databricks CLI using the [cookbook setup instructions](../../README.md#run-a-recipe). Ask a workspace admin to enable the previews required for custom images: [AWS](https://docs.databricks.com/aws/en/machine-learning/ai-runtime/cli/docker-images) | [Azure](https://learn.microsoft.com/en-us/azure/databricks/machine-learning/ai-runtime/cli/docker-images).
+1. Configure and authenticate the CLI using the [cookbook setup instructions](../../README.md#run-a-recipe). Ask a workspace admin to enable the custom-image previews: [AWS](https://docs.databricks.com/aws/en/machine-learning/ai-runtime/cli/docker-images) | [Azure](https://learn.microsoft.com/en-us/azure/databricks/machine-learning/ai-runtime/cli/docker-images).
 
-2. Install [Docker Desktop for Mac](https://docs.docker.com/desktop/setup/install/mac-install/), choosing the installer for your Mac's chip (Apple silicon or Intel). Open Docker Desktop and wait until its engine is running. Keep it running during both the build and the image push. AIR requires a `linux/amd64` image, including when building on Apple silicon; keep `--platform linux/amd64` in the build command below. The image is several GB, so allow space for the base image, build cache, and final image in Docker Desktop's disk allocation.
+2. Install [Docker Engine on Linux](https://docs.docker.com/engine/install/) or [Docker Desktop on macOS](https://docs.docker.com/desktop/setup/install/mac-install/) and start it. Keep Docker running through the build and push. On macOS, choose the installer for your chip. AIR requires `linux/amd64`, including on Apple silicon.
 
-3. Choose an existing Unity Catalog catalog and schema where you can push images. This example uses `main.default`; see the custom image guide above for the required Artifact Registry privileges. Check `env_variables.ADAPTER_OUTPUT_ROOT` in `workload.yaml`. Its default is:
+3. Choose an existing Unity Catalog schema where you can push images; this example uses `main.default`. See the custom-image guide above for privileges. Set `ADAPTER_OUTPUT_ROOT` in `workload.yaml` to a directory in an existing writable volume. Its default is:
 
    ```text
    /Volumes/main/default/air_examples/lora-nemotron-3.5-super-vl-120b-a12b-automodel-multi-gpu
    ```
 
-   The volume must already exist and be writable. To use another location, update `ADAPTER_OUTPUT_ROOT` to a directory in another existing writable volume.
-
-4. Check that the CLI can access AIR image commands and that Docker can reach its running engine before starting the large build:
+4. Check the CLI and Docker engine before building:
 
    ```bash
-   databricks air images push --help
+   databricks air images push -p PROFILE --help
    docker info
    ```
 
-   The first command should show image-push usage. The second should show a `Server` section without a connection error. If `docker` is missing, finish the Docker Desktop installation; if it cannot connect, start Docker Desktop and wait for the engine to be ready.
+   `docker info` should show a `Server` section without a connection error. If it cannot connect, start Docker and wait for the engine to be ready.
 
-5. Build the Super VL image for `linux/amd64` and push it into Unity Catalog:
+5. Build and push the image. Allow disk space and time for the several-GB image:
 
    ```bash
    docker build --platform linux/amd64 -t nemo-automodel-vl:26.08.00 .
-   databricks air images push -s nemo-automodel-vl:26.08.00 \
+   databricks air images push -p PROFILE -s nemo-automodel-vl:26.08.00 \
      --catalog main --schema default --artifact nemo-automodel-vl:26.08.00
    ```
 
-   `--artifact` names the destination so it matches `environment.unity_catalog_image` in `workload.yaml`. This command creates `main.default.nemo-automodel-vl:26.08.00`. To use a different catalog or schema, change `--catalog`/`--schema` above and update `environment.unity_catalog_image` to match. The build and push can take a while.
+   The destination is `main.default.nemo-automodel-vl:26.08.00`. If you change the catalog or schema, update `environment.unity_catalog_image` in `workload.yaml` to match.
 
-The Dockerfile's base image `nvcr.io/nvidia/nemo-automodel:26.08.00` is public, and it fetches the AutoModel source from public GitHub. You therefore do not need an NGC account, API key, or Docker login to build it. If you switch to an NGC image that requires authentication, run `docker login nvcr.io` first. Use `$oauthtoken` as the username and your NGC API key as the password.
+The base image and AutoModel source are public; no NGC login is required.
 
 ## Run
 
 ```bash
-databricks air run -f workload.yaml
+databricks air run -p PROFILE -f workload.yaml
 ```
 
 ## Results
