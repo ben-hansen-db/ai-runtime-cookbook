@@ -8,7 +8,7 @@ This recipe uses Ray Data and vLLM to caption and classify the 3,669 photos in t
 
 ## Run
 
-Replace `PROFILE` with your Databricks CLI profile name.
+Replace `PROFILE` with your Databricks CLI profile name. If you use only one Databricks workspace configured as your default CLI profile, you can omit `-p PROFILE`.
 
 ```bash
 databricks air run -p PROFILE -f workload.yaml
