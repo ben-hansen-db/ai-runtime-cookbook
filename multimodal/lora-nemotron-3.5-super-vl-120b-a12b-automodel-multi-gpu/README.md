@@ -10,7 +10,7 @@ Workload execution takes about 12 minutes. For the first run, the one-time image
 
 ## Before you run
 
-Complete these steps from this recipe's directory. Replace `PROFILE` with your Databricks CLI profile name.
+Complete these steps from this recipe's directory.
 
 1. Configure and authenticate the CLI using the [cookbook setup instructions](../../README.md#run-a-recipe). Ask a workspace admin to enable the custom-image previews: [AWS](https://docs.databricks.com/aws/en/machine-learning/ai-runtime/cli/docker-images) | [Azure](https://learn.microsoft.com/en-us/azure/databricks/machine-learning/ai-runtime/cli/docker-images).
 
@@ -25,7 +25,7 @@ Complete these steps from this recipe's directory. Replace `PROFILE` with your D
 4. Check the CLI and Docker engine before building:
 
    ```bash
-   databricks air images push -p PROFILE --help
+   databricks air images push --help
    docker info
    ```
 
@@ -35,7 +35,7 @@ Complete these steps from this recipe's directory. Replace `PROFILE` with your D
 
    ```bash
    docker build --platform linux/amd64 -t nemo-automodel-vl:26.08.00 .
-   databricks air images push -p PROFILE -s nemo-automodel-vl:26.08.00 \
+   databricks air images push -s nemo-automodel-vl:26.08.00 \
      --catalog main --schema default --artifact nemo-automodel-vl:26.08.00
    ```
 
@@ -46,7 +46,7 @@ The base image and AutoModel source are public; no NGC login is required.
 ## Run
 
 ```bash
-databricks air run -p PROFILE -f workload.yaml
+databricks air run -f workload.yaml
 ```
 
 ## Results
