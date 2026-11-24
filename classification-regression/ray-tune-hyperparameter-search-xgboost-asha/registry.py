@@ -48,7 +48,9 @@ def preflight_registration(workspace, catalog, schema, model):
     configure = f"Set uc_catalog/uc_schema and registered_model_name to a writable target for {model}."
     print(f"Checking Unity Catalog registration target {model} before tuning "
           f"(databricks-sdk {version('databricks-sdk')}).", flush=True)
-    catalog_info, _ = _read(workspace.catalogs.get, catalog)
+    catalog_info, catalog_missing = _read(workspace.catalogs.get, catalog, "CATALOG_DOES_NOT_EXIST")
+    if catalog_missing:
+        raise RuntimeError(f"Catalog {catalog} was not found for this run. Set uc_catalog to an existing writable catalog.")
     if catalog_info and catalog_info.catalog_type == CatalogType.DELTASHARING_CATALOG:
         raise RuntimeError(f"Catalog {catalog} is read-only (Delta Sharing). {configure}")
     if catalog_info and catalog_info.catalog_type in {CatalogType.FOREIGN_CATALOG, CatalogType.SYSTEM_CATALOG}:
