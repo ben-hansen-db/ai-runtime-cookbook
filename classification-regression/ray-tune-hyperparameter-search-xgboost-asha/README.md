@@ -4,7 +4,9 @@ This recipe uses Ray Tune and ASHA to search XGBoost hyperparameters on the publ
 
 ## Before you run
 
-Set `parameters.uc_catalog` / `parameters.uc_schema` to a Unity Catalog location you can write to; the schema is auto-created when you have `CREATE` on the catalog. Each run registers a new version of `<uc_catalog>.<uc_schema>.<registered_model_name>` (default `main.default.xgboost_covertype`).
+Set `uc_catalog`, `uc_schema`, and `registered_model_name` in the workload parameters to a writable Unity Catalog target (default `main.default.xgboost_covertype`). The workload identity needs `USE CATALOG` and `USE SCHEMA`. After tuning, the recipe reuses the schema or creates it if needed, which requires `CREATE SCHEMA` on the catalog.
+
+MLflow attempts to create the registered model before adding a version. Check `CREATE MODEL` (or `CREATE FUNCTION`) on the schema and, for an existing model, ownership or `CREATE MODEL VERSION`. Before loading data, the Ray head checks the target using read-only metadata. A Delta Sharing catalog or a browse-only parent stops the run. When metadata cannot confirm a privilege, the driver prints what to check and continues. Unity Catalog evaluates authorization when MLflow writes.
 
 ## Run
 
