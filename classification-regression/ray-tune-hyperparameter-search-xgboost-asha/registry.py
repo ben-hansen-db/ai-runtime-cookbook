@@ -6,11 +6,15 @@ from databricks.sdk.errors import AlreadyExists, DatabricksError, PermissionDeni
 from databricks.sdk.service.catalog import CatalogType
 
 
+# The SDK raises TimeoutError when its HTTP retry budget expires.
+METADATA_ERRORS = (DatabricksError, TimeoutError, ConnectionError)
+
+
 def _read(get, name, missing_code=None):
     try:
         return get(name, include_browse=True), False
-    except DatabricksError as exc:
-        if missing_code and exc.error_code == missing_code:
+    except METADATA_ERRORS as exc:
+        if missing_code and getattr(exc, "error_code", None) == missing_code:
             return None, True
         print(f"Could not inspect {name}: {exc}", flush=True)
         return None, False
@@ -33,7 +37,7 @@ def _effective_grants(workspace, principal, kind, name):
                 page_token = page.next_page_token
                 if not page_token:
                     break
-        except DatabricksError as exc:
+        except METADATA_ERRORS as exc:
             print(f"Could not inspect effective privileges on {name}: {exc}", flush=True)
     return grants
 
@@ -47,6 +51,11 @@ def preflight_registration(workspace, catalog, schema, model):
     catalog_info, _ = _read(workspace.catalogs.get, catalog)
     if catalog_info and catalog_info.catalog_type == CatalogType.DELTASHARING_CATALOG:
         raise RuntimeError(f"Catalog {catalog} is read-only (Delta Sharing). {configure}")
+    if catalog_info and catalog_info.catalog_type in {CatalogType.FOREIGN_CATALOG, CatalogType.SYSTEM_CATALOG}:
+        raise RuntimeError(
+            f"Catalog {catalog} ({catalog_info.catalog_type.value}) does not support model registration. "
+            f"{configure}"
+        )
     if catalog_info and catalog_info.browse_only is True:
         raise RuntimeError(f"Catalog {catalog} is browse-only for this caller; USE CATALOG is required. {configure}")
     schema_info, schema_missing = _read(workspace.schemas.get, full_schema, "SCHEMA_DOES_NOT_EXIST")
@@ -62,7 +71,7 @@ def preflight_registration(workspace, catalog, schema, model):
         owners = {caller} if caller else set()
         if caller:
             owners.update(group.display for group in identity.groups or [] if group.display)
-    except DatabricksError as exc:
+    except METADATA_ERRORS as exc:
         print(f"Could not identify the registration caller: {exc}", flush=True)
         caller, owners = None, set()
 
@@ -93,7 +102,7 @@ def preflight_registration(workspace, catalog, schema, model):
         if model_info:
             if model_info.owner not in owners:
                 grants = _effective_grants(workspace, caller, "function", model)
-                if "CREATE_MODEL_VERSION" not in grants:
+                if grants.isdisjoint({"ALL_PRIVILEGES", "CREATE_MODEL_VERSION"}):
                     unconfirmed.append(f"ownership or CREATE MODEL VERSION on {model} to add a version")
         else:
             state = "not found" if model_missing else "visibility unknown"
@@ -139,7 +148,10 @@ def model_logging_errors(model):
             isinstance(cause, MlflowException) and cause.error_code == "INTERNAL_ERROR"
         )):
             seen.add(id(cause))
-            cause = cause.__cause__
+            if cause.__cause__ is not None or cause.__suppress_context__:
+                cause = cause.__cause__
+            else:
+                cause = cause.__context__
         if isinstance(cause, PermissionDenied) or (
             isinstance(cause, MlflowException) and cause.error_code == "PERMISSION_DENIED"
         ):

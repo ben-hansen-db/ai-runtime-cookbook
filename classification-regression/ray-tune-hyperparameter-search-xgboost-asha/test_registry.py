@@ -42,6 +42,17 @@ class PreflightTests(TestCase):
         with self.assertRaisesRegex(RuntimeError, "USE CATALOG.*USE SCHEMA"):
             self.preflight()
 
+    def test_metadata_timeout_is_unknown(self):
+        for api, method in [("catalogs", "get"), ("schemas", "get"), ("registered_models", "get"),
+                            ("current_user", "me"), ("grants", "get_effective")]:
+            with self.subTest(api=api):
+                read = getattr(getattr(self.workspace, api), method)
+                read.side_effect = TimeoutError("metadata retries exhausted")
+                log = self.preflight()
+                self.assertIn("metadata retries exhausted", log)
+                self.assertIn("confirm", log)
+                read.side_effect = None
+
     def test_incomplete_visibility_reports_both_model_operations(self):
         self.workspace.registered_models.get.side_effect = PermissionDenied("limited visibility")
         log = self.preflight()
@@ -144,6 +155,19 @@ class PreflightTests(TestCase):
         })
         self.assertNotIn("confirm", self.preflight())
 
+    def test_all_privileges_on_model_covers_only_version_authority(self):
+        def grants(kind, name, **kwargs):
+            if (kind, name) == ("function", MODEL):
+                return catalog.EffectivePermissionsList.from_dict({"privilege_assignments": [{
+                    "principal": CALLER, "privileges": [{"privilege": "ALL_PRIVILEGES"}],
+                }]})
+            return catalog.EffectivePermissionsList()
+
+        self.workspace.grants.get_effective.side_effect = grants
+        log = self.preflight()
+        self.assertNotIn("ownership or CREATE MODEL VERSION", log)
+        self.assertIn("CREATE MODEL or CREATE FUNCTION", log)
+
     def test_unknown_caller_never_requests_unfiltered_grants(self):
         self.workspace.current_user.me.side_effect = PermissionDenied("unavailable")
         log = self.preflight()
@@ -197,6 +221,23 @@ class WriteBoundaryTests(TestCase):
             self.assertIs(caught.exception, error)
             self.assertIn("logging/registering " + MODEL, error.__notes__[0])
             self.assertIn("CREATE MODEL VERSION", error.__notes__[0])
+
+    def test_mlflow_implicit_denial_context_respects_explicit_chaining(self):
+        original = RestException({"error_code": "PERMISSION_DENIED", "message": "artifact credentials"})
+        for chain in ["implicit", "suppressed", "unrelated cause"]:
+            with self.subTest(chain=chain), self.assertRaises(MlflowException) as caught:
+                with model_logging_errors(MODEL):
+                    try:
+                        raise original
+                    except RestException:
+                        error = MlflowException("could not upload artifact")
+                        if chain == "suppressed":
+                            raise error from None
+                        if chain == "unrelated cause":
+                            raise error from TimeoutError("expired")
+                        raise error
+            self.assertIs(caught.exception.__context__, original)
+            self.assertEqual(bool(getattr(caught.exception, "__notes__", None)), chain == "implicit")
 
     def test_unrelated_logging_errors_keep_original_diagnostic(self):
         for error in [MlflowException("permission text only"), Unauthenticated("expired"),

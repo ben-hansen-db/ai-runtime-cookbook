@@ -44,6 +44,32 @@ class DriverTests(unittest.TestCase):
         workspace.catalogs.get.assert_called_once_with("main", include_browse=True)
         workspace.schemas.create.assert_not_called()
 
+    def test_catalog_types_without_model_registration_stop_only_tracking_runs(self):
+        for kind in [CatalogType.FOREIGN_CATALOG, CatalogType.SYSTEM_CATALOG]:
+            with self.subTest(kind=kind):
+                workspace = MagicMock()
+                workspace.catalogs.get.return_value = CatalogInfo(catalog_type=kind)
+                workspace.current_user.me.side_effect = PermissionDenied("unknown")
+                error, start_ray = self.run_driver(workspace, "tracking-run")
+                self.assertIn(kind.value, str(error))
+                self.assertIn("model registration", str(error))
+                self.assertNotIn("read-only", str(error))
+                start_ray.assert_not_called()
+                workspace.schemas.create.assert_not_called()
+                _, local_ray = self.run_driver(workspace, "")
+                local_ray.assert_called_once()
+
+    def test_other_catalog_types_continue_without_treating_type_as_write_permission(self):
+        for kind in [CatalogType.MANAGED_CATALOG, None]:
+            with self.subTest(kind=kind):
+                workspace = MagicMock()
+                workspace.catalogs.get.return_value = CatalogInfo(catalog_type=kind)
+                workspace.schemas.get.return_value = SchemaInfo()
+                workspace.current_user.me.side_effect = PermissionDenied("unknown")
+                _, start_ray = self.run_driver(workspace, "tracking-run")
+                start_ray.assert_called_once()
+                workspace.registered_models.get.assert_called_once()
+
     def test_browse_only_parent_stops_registration(self):
         for catalog, schema in [(True, False), (False, True)]:
             with self.subTest(catalog=catalog):
